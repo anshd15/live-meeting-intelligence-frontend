@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import io from "socket.io-client";
 
-const socket = io("https://live-meeting-intelligence-backend.onrender.com");
+const socket = io("https://live-meeting-intelligence-backend.onrender.com", {
+  transports: ["websocket"],
+});
 
 export default function Room() {
   const { roomId } = useParams();
@@ -10,28 +12,29 @@ export default function Room() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerRef = useRef(null);
-
-  const [isReady, setIsReady] = useState(false);
-  const isCaller = useRef(false);
+  const localStreamRef = useRef(null);
+  const pendingCandidates = useRef([]);
 
   useEffect(() => {
-    async function init() {
+    const init = async () => {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: true
+        audio: true,
       });
 
+      localStreamRef.current = stream;
       localVideoRef.current.srcObject = stream;
 
       peerRef.current = new RTCPeerConnection({
         iceServers: [
           { urls: "stun:stun.l.google.com:19302" },
-          {
-            urls: "turn:global.relay.metered.ca:80",
-            username: "TURN_USER",
-            credential: "TURN_PASS"
-          }
-        ]
+          // ❗ replace with real TURN creds
+          // {
+          //   urls: "turn:your.turn.server:3478",
+          //   username: "user",
+          //   credential: "pass",
+          // }
+        ],
       });
 
       stream.getTracks().forEach(track =>
@@ -44,51 +47,57 @@ export default function Room() {
 
       peerRef.current.onicecandidate = e => {
         if (e.candidate) {
-          socket.emit("ice-candidate", e.candidate, roomId);
+          socket.emit("ice-candidate", {
+            candidate: e.candidate,
+            roomId,
+          });
         }
       };
 
-      setIsReady(true);
       socket.emit("join-room", roomId);
-    }
+    };
 
     init();
 
-    socket.on("room-info", count => {
-      if (count === 1) {
-        isCaller.current = true;
-      }
-    });
-
-    socket.on("user-joined", async () => {
-      if (!isReady || !isCaller.current) return;
-
-      const offer = await peerRef.current.createOffer();
-      await peerRef.current.setLocalDescription(offer);
-      socket.emit("offer", offer, roomId);
-    });
-
-    socket.on("offer", async offer => {
-      if (!peerRef.current) return;
-
+    socket.on("offer", async ({ offer }) => {
       await peerRef.current.setRemoteDescription(offer);
+
+      // apply buffered ICE
+      pendingCandidates.current.forEach(c =>
+        peerRef.current.addIceCandidate(c)
+      );
+      pendingCandidates.current = [];
+
       const answer = await peerRef.current.createAnswer();
       await peerRef.current.setLocalDescription(answer);
-      socket.emit("answer", answer, roomId);
+
+      socket.emit("answer", { answer, roomId });
     });
 
-    socket.on("answer", async answer => {
+    socket.on("answer", async ({ answer }) => {
       await peerRef.current.setRemoteDescription(answer);
     });
 
-    socket.on("ice-candidate", async candidate => {
-      if (peerRef.current) {
+    socket.on("ice-candidate", async ({ candidate }) => {
+      if (!peerRef.current.remoteDescription) {
+        pendingCandidates.current.push(candidate);
+      } else {
         await peerRef.current.addIceCandidate(candidate);
       }
     });
 
-    return () => socket.disconnect();
-  }, [roomId, isReady]);
+    socket.on("ready", async () => {
+      const offer = await peerRef.current.createOffer();
+      await peerRef.current.setLocalDescription(offer);
+
+      socket.emit("offer", { offer, roomId });
+    });
+
+    return () => {
+      peerRef.current?.close();
+      socket.off();
+    };
+  }, [roomId]);
 
   return (
     <div style={{ display: "flex", gap: 20, padding: 20 }}>
