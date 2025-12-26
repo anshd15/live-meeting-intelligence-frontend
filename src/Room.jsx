@@ -27,19 +27,36 @@ export default function Room() {
       localVideoRef.current.srcObject = stream;
 
       peerRef.current = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+
+          {
+            urls: "turn:global.relay.metered.ca:80",
+            username: import.meta.env.VITE_TURN_USERNAME,
+            credential: import.meta.env.VITE_TURN_CREDENTIAL,
+          },
+          {
+            urls: "turn:global.relay.metered.ca:443",
+            username: import.meta.env.VITE_TURN_USERNAME,
+            credential: import.meta.env.VITE_TURN_CREDENTIAL,
+          },
+          {
+            urls: "turn:global.relay.metered.ca:80?transport=tcp",
+            username: import.meta.env.VITE_TURN_USERNAME,
+            credential: import.meta.env.VITE_TURN_CREDENTIAL,
+          },
+        ],
       });
+      stream
+        .getTracks()
+        .forEach((track) => peerRef.current.addTrack(track, stream));
 
-      stream.getTracks().forEach(track =>
-        peerRef.current.addTrack(track, stream)
-      );
-
-      peerRef.current.ontrack = e => {
+      peerRef.current.ontrack = (e) => {
         console.log("📺 Remote track received");
         remoteVideoRef.current.srcObject = e.streams[0];
       };
 
-      peerRef.current.onicecandidate = e => {
+      peerRef.current.onicecandidate = (e) => {
         if (e.candidate) {
           socket.emit("ice-candidate", {
             candidate: e.candidate,
