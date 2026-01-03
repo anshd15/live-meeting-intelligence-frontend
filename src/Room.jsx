@@ -11,6 +11,7 @@ export default function Room() {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+
   const peerRef = useRef(null);
   const isCaller = useRef(false);
   const pendingCandidates = useRef([]);
@@ -19,6 +20,7 @@ export default function Room() {
     console.log("🔵 Room mounted");
 
     const init = async () => {
+      // 1️⃣ Get user media
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true,
@@ -26,36 +28,28 @@ export default function Room() {
 
       localVideoRef.current.srcObject = stream;
 
-      peerRef.current = new RTCPeerConnection({
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
+      // 2️⃣ Fetch ICE servers securely from backend
+      const iceRes = await fetch(
+        "https://live-meeting-intelligence-backend.onrender.com/api/ice"
+      );
+      const { iceServers } = await iceRes.json();
 
-          {
-            urls: "turn:global.relay.metered.ca:80",
-            username: import.meta.env.VITE_TURN_USERNAME,
-            credential: import.meta.env.VITE_TURN_CREDENTIAL,
-          },
-          {
-            urls: "turn:global.relay.metered.ca:443",
-            username: import.meta.env.VITE_TURN_USERNAME,
-            credential: import.meta.env.VITE_TURN_CREDENTIAL,
-          },
-          {
-            urls: "turn:global.relay.metered.ca:80?transport=tcp",
-            username: import.meta.env.VITE_TURN_USERNAME,
-            credential: import.meta.env.VITE_TURN_CREDENTIAL,
-          },
-        ],
+
+      // 3️⃣ Create PeerConnection
+      peerRef.current = new RTCPeerConnection({ iceServers });
+
+      // 4️⃣ Add local tracks
+      stream.getTracks().forEach((track) => {
+        peerRef.current.addTrack(track, stream);
       });
-      stream
-        .getTracks()
-        .forEach((track) => peerRef.current.addTrack(track, stream));
 
+      // 5️⃣ Remote track handling
       peerRef.current.ontrack = (e) => {
         console.log("📺 Remote track received");
         remoteVideoRef.current.srcObject = e.streams[0];
       };
 
+      // 6️⃣ ICE candidate handling
       peerRef.current.onicecandidate = (e) => {
         if (e.candidate) {
           socket.emit("ice-candidate", {
@@ -65,12 +59,13 @@ export default function Room() {
         }
       };
 
+      // 7️⃣ Join room
       socket.emit("join-room", roomId);
     };
 
     init();
 
-    // 👇 SERVER TELLS WHO IS CALLER
+    // 🟢 SERVER DECIDES CALLER
     socket.on("ready", ({ callerId }) => {
       if (socket.id === callerId) {
         isCaller.current = true;
@@ -94,12 +89,25 @@ export default function Room() {
       const answer = await peerRef.current.createAnswer();
       await peerRef.current.setLocalDescription(answer);
       socket.emit("answer", { answer, roomId });
+
+      // 🔥 Add queued ICE candidates
+      pendingCandidates.current.forEach((c) =>
+        peerRef.current.addIceCandidate(c)
+      );
+      pendingCandidates.current = [];
     });
 
     socket.on("answer", async ({ answer }) => {
       console.log("📨 ANSWER received");
       if (peerRef.current.signalingState !== "have-local-offer") return;
+
       await peerRef.current.setRemoteDescription(answer);
+
+      // 🔥 Add queued ICE candidates
+      pendingCandidates.current.forEach((c) =>
+        peerRef.current.addIceCandidate(c)
+      );
+      pendingCandidates.current = [];
     });
 
     socket.on("ice-candidate", async ({ candidate }) => {
@@ -111,6 +119,7 @@ export default function Room() {
     });
 
     return () => {
+      console.log("🔴 Room unmounted");
       peerRef.current?.close();
       socket.off();
     };
@@ -118,8 +127,19 @@ export default function Room() {
 
   return (
     <div style={{ display: "flex", gap: 20, padding: 20 }}>
-      <video ref={localVideoRef} autoPlay muted playsInline width="320" />
-      <video ref={remoteVideoRef} autoPlay playsInline width="320" />
+      <video
+        ref={localVideoRef}
+        autoPlay
+        muted
+        playsInline
+        width="320"
+      />
+      <video
+        ref={remoteVideoRef}
+        autoPlay
+        playsInline
+        width="320"
+      />
     </div>
   );
 }
