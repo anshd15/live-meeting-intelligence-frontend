@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
-import Home from "./Home";
-import Room from "./Room";
+import Home from "./pages/Home/Home";
+import Room from "./pages/Room";
+import "./index.css";
 
 export default function App() {
   return (
