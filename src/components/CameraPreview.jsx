@@ -18,7 +18,7 @@ const toggleCamera = async () => {
 
   useEffect(() => {
     navigator.mediaDevices
-      .getUserMedia({ video: false, audio: false })
+      .getUserMedia({ video: true, audio: false })
       .then((stream) => {
         videoRef.current.srcObject = stream;
       });
