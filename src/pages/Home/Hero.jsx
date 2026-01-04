@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { useNavigate } from "react-router-dom";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "../../firebase";
 
 export default function Hero() {
   const titleRef = useRef(null);
@@ -16,9 +18,19 @@ export default function Hero() {
     });
   }, []);
 
-  const createRoom = () => {
-    const id = Math.random().toString(36).substring(2, 8);
-    navigate(`/room/${id}`);
+  const startMeetingWithLogin = async () => {
+    try {
+      // 🔐 Ask for Google login ONLY on button click
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+
+      // ✅ After successful login, create room
+      const roomId = Math.random().toString(36).substring(2, 8);
+      navigate(`/room/${roomId}`);
+    } catch (err) {
+      console.error("Google login failed:", err);
+      alert("Google login was cancelled or failed");
+    }
   };
 
   return (
@@ -39,7 +51,7 @@ export default function Hero() {
         </p>
 
         <button
-          onClick={createRoom}
+          onClick={startMeetingWithLogin}
           className="btn btn-primary btn-lg mt-10 px-12 shadow-lg shadow-indigo-500/30"
         >
           🚀 Start New Meeting
