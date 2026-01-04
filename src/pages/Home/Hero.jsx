@@ -18,24 +18,23 @@ export default function Hero() {
     });
   }, []);
 
-  const startMeetingWithLogin = async () => {
+  const startMeeting = async () => {
     try {
-      // 🔐 Ask for Google login ONLY on button click
+      // 🔐 Google login ONLY on button click
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
 
-      // ✅ After successful login, create room
+      // 🎥 Create room AFTER login
       const roomId = Math.random().toString(36).substring(2, 8);
       navigate(`/room/${roomId}`);
     } catch (err) {
-      console.error("Google login failed:", err);
-      alert("Google login was cancelled or failed");
+      console.error(err);
+      alert("Google login cancelled or failed");
     }
   };
 
   return (
     <section className="relative px-6 pt-28 pb-24 text-center">
-      {/* Blobs */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-500/30 rounded-full blur-3xl animate-pulse" />
       <div className="absolute top-20 -right-40 w-96 h-96 bg-purple-500/30 rounded-full blur-3xl animate-pulse delay-1000" />
 
@@ -51,7 +50,7 @@ export default function Hero() {
         </p>
 
         <button
-          onClick={startMeetingWithLogin}
+          onClick={startMeeting}
           className="btn btn-primary btn-lg mt-10 px-12 shadow-lg shadow-indigo-500/30"
         >
           🚀 Start New Meeting
