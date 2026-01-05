@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home/Home";
 import Dashboard from "./pages/Dashboard";
 import Lobby from "./pages/Lobby/Lobby";
-import Room from "./pages/Room";
+import Room from "./pages/Room/Room";
 import "./index.css";
 
 export default function App() {
