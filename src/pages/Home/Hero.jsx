@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { useNavigate } from "react-router-dom";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth } from "../../firebase";
+import GoogleLoginButton from "../../components/GoogleLoginButton";
+import { useAuth } from "../../auth/useAuth";
 
 export default function Hero() {
   const titleRef = useRef(null);
   const navigate = useNavigate();
+  const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
     gsap.from(titleRef.current.children, {
@@ -18,20 +19,12 @@ export default function Hero() {
     });
   }, []);
 
-  const startMeeting = async () => {
-    try {
-      // 🔐 Google login ONLY on button click
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-
-      // 🎥 Create room AFTER login
-      const roomId = Math.random().toString(36).substring(2, 8);
-      navigate(`/room/${roomId}`);
-    } catch (err) {
-      console.error(err);
-      alert("Google login cancelled or failed");
+  // If already logged in → go to dashboard
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      navigate("/dashboard");
     }
-  };
+  }, [loading, isAuthenticated, navigate]);
 
   return (
     <section className="relative px-6 pt-28 pb-24 text-center">
@@ -49,12 +42,11 @@ export default function Hero() {
           Secure, real-time video meetings powered by WebRTC.
         </p>
 
-        <button
-          onClick={startMeeting}
-          className="btn btn-primary btn-lg mt-10 px-12 shadow-lg shadow-indigo-500/30"
-        >
-          🚀 Start New Meeting
-        </button>
+        {!loading && !isAuthenticated && (
+          <div className="mt-10">
+            <GoogleLoginButton />
+          </div>
+        )}
       </div>
     </section>
   );
