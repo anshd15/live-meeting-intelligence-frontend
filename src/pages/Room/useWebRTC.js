@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import socket from "../../socket/socket";
 
-const BACKEND_URL =
-  "https://live-meeting-intelligence-backend.onrender.com";
+const BACKEND_URL = "https://live-meeting-intelligence-backend.onrender.com";
 
 export function useWebRTC(roomId, user) {
   const localVideoRef = useRef(null);
@@ -13,10 +12,10 @@ export function useWebRTC(roomId, user) {
   const pendingCandidates = useRef([]);
   const isCaller = useRef(false);
 
-  const [status, setStatus] = useState("connecting");
+  const [status, setStatus] = useState("idle");
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) return; 
 
     start();
 
@@ -41,9 +40,7 @@ export function useWebRTC(roomId, user) {
     // 3️⃣ Peer
     peerRef.current = new RTCPeerConnection({ iceServers });
 
-    stream.getTracks().forEach((t) =>
-      peerRef.current.addTrack(t, stream)
-    );
+    stream.getTracks().forEach((t) => peerRef.current.addTrack(t, stream));
 
     peerRef.current.ontrack = (e) => {
       remoteVideoRef.current.srcObject = e.streams[0];

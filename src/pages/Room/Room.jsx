@@ -10,21 +10,14 @@ export default function Room() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
-  // 🔴 FIX: redirect ONLY inside useEffect
+  // ✅ Redirect must be in effect
   useEffect(() => {
     if (!loading && !user) {
       navigate("/");
     }
   }, [loading, user, navigate]);
 
-  if (loading || !user) {
-    return (
-      <div className="h-screen flex items-center justify-center text-white">
-        Connecting…
-      </div>
-    );
-  }
-
+  // ✅ ALWAYS call the hook (no condition)
   const {
     localVideoRef,
     remoteVideoRef,
@@ -33,6 +26,14 @@ export default function Room() {
     toggleVideo,
     cleanup,
   } = useWebRTC(roomId, user);
+
+  if (loading || !user) {
+    return (
+      <div className="h-screen flex items-center justify-center text-white">
+        Connecting…
+      </div>
+    );
+  }
 
   const leave = () => {
     cleanup();
