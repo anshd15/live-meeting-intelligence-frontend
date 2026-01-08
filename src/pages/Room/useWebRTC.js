@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import socket from "../../socket/socket";
 
-const BACKEND_URL =
-  "https://live-meeting-intelligence-backend.onrender.com";
+const BACKEND_URL = "https://live-meeting-intelligence-backend.onrender.com";
 
 export function useWebRTC(roomId, user) {
   /* ---------------- REFS ---------------- */
@@ -22,10 +21,21 @@ export function useWebRTC(roomId, user) {
   useEffect(() => {
     if (!user) return;
 
-    start();
+    const onAdmitted = () => {
+      start();
+    };
 
-    return cleanup;
-    // eslint-disable-next-line
+    // Host starts immediately
+    socket.on("host", start);
+
+    // Guest starts only after approval
+    socket.on("admitted", onAdmitted);
+
+    return () => {
+      socket.off("host", start);
+      socket.off("admitted", onAdmitted);
+      cleanup();
+    };
   }, [user]);
 
   /* ---------------- START ---------------- */
@@ -49,9 +59,9 @@ export function useWebRTC(roomId, user) {
     /* 🤝 Peer connection */
     peerRef.current = new RTCPeerConnection({ iceServers });
 
-    stream.getTracks().forEach((track) =>
-      peerRef.current.addTrack(track, stream)
-    );
+    stream
+      .getTracks()
+      .forEach((track) => peerRef.current.addTrack(track, stream));
 
     peerRef.current.ontrack = (e) => {
       if (remoteVideoRef.current) {
@@ -168,8 +178,7 @@ export function useWebRTC(roomId, user) {
   };
 
   const stopScreenShare = () => {
-    const cameraTrack =
-      localStreamRef.current?.getVideoTracks()[0];
+    const cameraTrack = localStreamRef.current?.getVideoTracks()[0];
 
     const sender = peerRef.current
       .getSenders()
