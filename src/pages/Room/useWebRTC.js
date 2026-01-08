@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import socket from "../../socket/socket";
 
-const BACKEND_URL =
-  "https://live-meeting-intelligence-backend.onrender.com";
+const BACKEND_URL = "https://live-meeting-intelligence-backend.onrender.com";
 
 export function useWebRTC(roomId, user) {
   /* ---------------- REFS ---------------- */
@@ -31,10 +30,8 @@ export function useWebRTC(roomId, user) {
   useEffect(() => {
     if (!user) return;
 
-    
-  log("useEffect triggered");
-  log("User:", user.displayName);
-
+    // log("useEffect triggered");
+    // log("User:", user.displayName);
 
     // Attach auth BEFORE connect
     socket.auth = {
@@ -75,7 +72,6 @@ export function useWebRTC(roomId, user) {
     await waitForVideos();
     await startWebRTC();
     socket.emit("client-ready", { roomId });
-
   };
 
   /* ---------------- START WEBRTC ---------------- */
@@ -88,10 +84,11 @@ export function useWebRTC(roomId, user) {
     });
 
     localStreamRef.current = stream;
-
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
+    if (!localVideoRef.current) {
+      console.warn("[WebRTC] localVideoRef is null, aborting start");
+      return;
     }
+    localVideoRef.current.srcObject = stream;
 
     /* 🌐 ICE servers */
     const res = await fetch(`${BACKEND_URL}/api/ice`);
@@ -100,14 +97,16 @@ export function useWebRTC(roomId, user) {
     /* 🤝 Peer */
     peerRef.current = new RTCPeerConnection({ iceServers });
 
-    stream.getTracks().forEach((track) =>
-      peerRef.current.addTrack(track, stream)
-    );
+    stream
+      .getTracks()
+      .forEach((track) => peerRef.current.addTrack(track, stream));
 
     peerRef.current.ontrack = (e) => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = e.streams[0];
+      if (!remoteVideoRef.current) {
+        console.warn("[WebRTC] remoteVideoRef is null");
+        return;
       }
+      remoteVideoRef.current.srcObject = e.streams[0];
     };
 
     peerRef.current.onicecandidate = (e) => {
@@ -197,8 +196,7 @@ export function useWebRTC(roomId, user) {
   };
 
   const stopScreenShare = () => {
-    const cameraTrack =
-      localStreamRef.current?.getVideoTracks()[0];
+    const cameraTrack = localStreamRef.current?.getVideoTracks()[0];
 
     const sender = peerRef.current
       .getSenders()
