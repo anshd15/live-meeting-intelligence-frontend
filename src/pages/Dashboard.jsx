@@ -5,6 +5,17 @@ import { useAuth } from "../auth/useAuth";
 export default function Dashboard() {
   const { user, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const handleLogout = () => {
+    // Clear auth data
+    localStorage.removeItem("token");
+    localStorage.removeItem("user"); // if you store user info
+
+    // Optional: clear sessionStorage too
+    sessionStorage.clear();
+
+    // Redirect to login
+    navigate("/login", { replace: true });
+  };
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -38,19 +49,17 @@ export default function Dashboard() {
           />
 
           <div>
-            <h1 className="text-3xl font-bold">
-              Welcome, {user.displayName}
-            </h1>
+            <h1 className="text-3xl font-bold">Welcome, {user.displayName}</h1>
             <p className="text-slate-400">{user.email}</p>
           </div>
         </div>
 
         <div className="mt-12">
-          <button
-            onClick={createRoom}
-            className="btn btn-primary btn-lg px-10"
-          >
+          <button onClick={createRoom} className="btn btn-primary btn-lg px-10">
             ➕ Create New Meeting
+          </button>
+          <button onClick={handleLogout} className="btn btn-error btn-sm">
+            Logout
           </button>
         </div>
       </div>
