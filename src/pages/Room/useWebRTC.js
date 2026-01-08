@@ -31,6 +31,11 @@ export function useWebRTC(roomId, user) {
   useEffect(() => {
     if (!user) return;
 
+    
+  log("useEffect triggered");
+  log("User:", user.displayName);
+
+
     // Attach auth BEFORE connect
     socket.auth = {
       user: {
@@ -69,6 +74,8 @@ export function useWebRTC(roomId, user) {
 
     await waitForVideos();
     await startWebRTC();
+    socket.emit("client-ready", { roomId });
+
   };
 
   /* ---------------- START WEBRTC ---------------- */
