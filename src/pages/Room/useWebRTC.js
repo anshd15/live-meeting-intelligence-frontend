@@ -21,22 +21,36 @@ export function useWebRTC(roomId, user) {
   useEffect(() => {
     if (!user) return;
 
+    // 🔑 attach auth BEFORE connecting
+    socket.auth = {
+      user: {
+        name: user.displayName,
+        email: user.email,
+        photo: user.photoURL,
+      },
+    };
+
+    socket.connect();
+
+    socket.emit("join-room", { roomId, user });
+
+    const onHost = () => {
+      start();
+    };
+
     const onAdmitted = () => {
       start();
     };
 
-    // Host starts immediately
-    socket.on("host", start);
-
-    // Guest starts only after approval
+    socket.on("host", onHost);
     socket.on("admitted", onAdmitted);
 
     return () => {
-      socket.off("host", start);
+      socket.off("host", onHost);
       socket.off("admitted", onAdmitted);
       cleanup();
     };
-  }, [user]);
+  }, [user, roomId]);
 
   /* ---------------- START ---------------- */
   const start = async () => {
@@ -91,8 +105,8 @@ export function useWebRTC(roomId, user) {
       },
     };
 
-    socket.connect();
-    socket.emit("join-room", roomId);
+    // socket.connect();
+    // socket.emit("join-room", roomId);
 
     /* 📞 Signaling listeners */
     socket.on("ready", onReady);
