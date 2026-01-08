@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import socket from "../../socket/socket";
 
-const BACKEND_URL = "https://live-meeting-intelligence-backend.onrender.com";
+const BACKEND_URL =
+  "https://live-meeting-intelligence-backend.onrender.com";
 
 export function useWebRTC(roomId, user) {
   /* ---------------- REFS ---------------- */
@@ -12,16 +13,25 @@ export function useWebRTC(roomId, user) {
   const localStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
   const pendingCandidates = useRef([]);
-  const isCaller = useRef(false);
+  const startedRef = useRef(false); // 🔑 prevents double start
 
   /* ---------------- STATE ---------------- */
   const [status, setStatus] = useState("idle");
 
+  /* ---------------- HELPERS ---------------- */
+
+  const waitForVideos = async () => {
+    while (!localVideoRef.current || !remoteVideoRef.current) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  };
+
   /* ---------------- EFFECT ---------------- */
+
   useEffect(() => {
     if (!user) return;
 
-    // 🔑 attach auth BEFORE connecting
+    // Attach auth BEFORE connect
     socket.auth = {
       user: {
         name: user.displayName,
@@ -31,15 +41,14 @@ export function useWebRTC(roomId, user) {
     };
 
     socket.connect();
-
     socket.emit("join-room", { roomId, user });
 
-    const onHost = () => {
-      start();
+    const onHost = async () => {
+      await safeStart();
     };
 
-    const onAdmitted = () => {
-      start();
+    const onAdmitted = async () => {
+      await safeStart();
     };
 
     socket.on("host", onHost);
@@ -52,8 +61,19 @@ export function useWebRTC(roomId, user) {
     };
   }, [user, roomId]);
 
-  /* ---------------- START ---------------- */
-  const start = async () => {
+  /* ---------------- SAFE START ---------------- */
+
+  const safeStart = async () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    await waitForVideos();
+    await startWebRTC();
+  };
+
+  /* ---------------- START WEBRTC ---------------- */
+
+  const startWebRTC = async () => {
     /* 🎥 Local media */
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
@@ -70,12 +90,12 @@ export function useWebRTC(roomId, user) {
     const res = await fetch(`${BACKEND_URL}/api/ice`);
     const { iceServers } = await res.json();
 
-    /* 🤝 Peer connection */
+    /* 🤝 Peer */
     peerRef.current = new RTCPeerConnection({ iceServers });
 
-    stream
-      .getTracks()
-      .forEach((track) => peerRef.current.addTrack(track, stream));
+    stream.getTracks().forEach((track) =>
+      peerRef.current.addTrack(track, stream)
+    );
 
     peerRef.current.ontrack = (e) => {
       if (remoteVideoRef.current) {
@@ -96,31 +116,20 @@ export function useWebRTC(roomId, user) {
       setStatus(peerRef.current.iceConnectionState);
     };
 
-    /* 🔌 Socket setup */
-    socket.auth = {
-      user: {
-        name: user.displayName,
-        email: user.email,
-        photo: user.photoURL,
-      },
-    };
-
-    // socket.connect();
-    // socket.emit("join-room", roomId);
-
-    /* 📞 Signaling listeners */
+    /* 📞 Signaling */
     socket.on("ready", onReady);
     socket.on("offer", onOffer);
     socket.on("answer", onAnswer);
     socket.on("ice-candidate", onRemoteIce);
   };
 
-  /* ---------------- SIGNALING HANDLERS ---------------- */
+  /* ---------------- SIGNALING ---------------- */
 
-  const onReady = ({ callerId }) => {
+  const onReady = async ({ callerId }) => {
     if (socket.id === callerId) {
-      isCaller.current = true;
-      createOffer();
+      const offer = await peerRef.current.createOffer();
+      await peerRef.current.setLocalDescription(offer);
+      socket.emit("offer", { offer, roomId });
     }
   };
 
@@ -145,12 +154,6 @@ export function useWebRTC(roomId, user) {
     }
   };
 
-  const createOffer = async () => {
-    const offer = await peerRef.current.createOffer();
-    await peerRef.current.setLocalDescription(offer);
-    socket.emit("offer", { offer, roomId });
-  };
-
   const flushCandidates = () => {
     pendingCandidates.current.forEach((c) =>
       peerRef.current.addIceCandidate(c)
@@ -170,29 +173,25 @@ export function useWebRTC(roomId, user) {
     if (track) track.enabled = !track.enabled;
   };
 
-  /* 🖥 Screen sharing (safe replaceTrack) */
   const startScreenShare = async () => {
     const screenStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
     });
 
     const screenTrack = screenStream.getVideoTracks()[0];
-
     const sender = peerRef.current
       .getSenders()
       .find((s) => s.track?.kind === "video");
 
-    if (sender) {
-      sender.replaceTrack(screenTrack);
-    }
+    if (sender) sender.replaceTrack(screenTrack);
 
     screenStreamRef.current = screenStream;
-
     screenTrack.onended = stopScreenShare;
   };
 
   const stopScreenShare = () => {
-    const cameraTrack = localStreamRef.current?.getVideoTracks()[0];
+    const cameraTrack =
+      localStreamRef.current?.getVideoTracks()[0];
 
     const sender = peerRef.current
       .getSenders()
@@ -221,6 +220,7 @@ export function useWebRTC(roomId, user) {
 
     peerRef.current?.close();
     peerRef.current = null;
+    startedRef.current = false;
   };
 
   /* ---------------- EXPORT ---------------- */
