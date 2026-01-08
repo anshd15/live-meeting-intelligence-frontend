@@ -1,21 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import socket from "../../socket/socket";
 
-const BACKEND_URL = "https://live-meeting-intelligence-backend.onrender.com";
+const BACKEND_URL =
+  "https://live-meeting-intelligence-backend.onrender.com";
 
 export function useWebRTC(roomId, user) {
+  /* ---------------- REFS ---------------- */
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
 
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
+  const screenStreamRef = useRef(null);
   const pendingCandidates = useRef([]);
   const isCaller = useRef(false);
 
+  /* ---------------- STATE ---------------- */
   const [status, setStatus] = useState("idle");
 
+  /* ---------------- EFFECT ---------------- */
   useEffect(() => {
-    if (!user) return; 
+    if (!user) return;
 
     start();
 
@@ -23,27 +28,35 @@ export function useWebRTC(roomId, user) {
     // eslint-disable-next-line
   }, [user]);
 
+  /* ---------------- START ---------------- */
   const start = async () => {
-    // 1️⃣ Media
+    /* 🎥 Local media */
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
       audio: true,
     });
 
     localStreamRef.current = stream;
-    localVideoRef.current.srcObject = stream;
 
-    // 2️⃣ ICE servers
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
+
+    /* 🌐 ICE servers */
     const res = await fetch(`${BACKEND_URL}/api/ice`);
     const { iceServers } = await res.json();
 
-    // 3️⃣ Peer
+    /* 🤝 Peer connection */
     peerRef.current = new RTCPeerConnection({ iceServers });
 
-    stream.getTracks().forEach((t) => peerRef.current.addTrack(t, stream));
+    stream.getTracks().forEach((track) =>
+      peerRef.current.addTrack(track, stream)
+    );
 
     peerRef.current.ontrack = (e) => {
-      remoteVideoRef.current.srcObject = e.streams[0];
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = e.streams[0];
+      }
     };
 
     peerRef.current.onicecandidate = (e) => {
@@ -59,7 +72,7 @@ export function useWebRTC(roomId, user) {
       setStatus(peerRef.current.iceConnectionState);
     };
 
-    // 4️⃣ Socket
+    /* 🔌 Socket setup */
     socket.auth = {
       user: {
         name: user.displayName,
@@ -71,33 +84,41 @@ export function useWebRTC(roomId, user) {
     socket.connect();
     socket.emit("join-room", roomId);
 
-    socket.on("ready", ({ callerId }) => {
-      if (socket.id === callerId) {
-        isCaller.current = true;
-        createOffer();
-      }
-    });
+    /* 📞 Signaling listeners */
+    socket.on("ready", onReady);
+    socket.on("offer", onOffer);
+    socket.on("answer", onAnswer);
+    socket.on("ice-candidate", onRemoteIce);
+  };
 
-    socket.on("offer", async ({ offer }) => {
-      await peerRef.current.setRemoteDescription(offer);
-      const answer = await peerRef.current.createAnswer();
-      await peerRef.current.setLocalDescription(answer);
-      socket.emit("answer", { answer, roomId });
-      flushCandidates();
-    });
+  /* ---------------- SIGNALING HANDLERS ---------------- */
 
-    socket.on("answer", async ({ answer }) => {
-      await peerRef.current.setRemoteDescription(answer);
-      flushCandidates();
-    });
+  const onReady = ({ callerId }) => {
+    if (socket.id === callerId) {
+      isCaller.current = true;
+      createOffer();
+    }
+  };
 
-    socket.on("ice-candidate", async ({ candidate }) => {
-      if (!peerRef.current.remoteDescription) {
-        pendingCandidates.current.push(candidate);
-      } else {
-        await peerRef.current.addIceCandidate(candidate);
-      }
-    });
+  const onOffer = async ({ offer }) => {
+    await peerRef.current.setRemoteDescription(offer);
+    const answer = await peerRef.current.createAnswer();
+    await peerRef.current.setLocalDescription(answer);
+    socket.emit("answer", { answer, roomId });
+    flushCandidates();
+  };
+
+  const onAnswer = async ({ answer }) => {
+    await peerRef.current.setRemoteDescription(answer);
+    flushCandidates();
+  };
+
+  const onRemoteIce = async ({ candidate }) => {
+    if (!peerRef.current.remoteDescription) {
+      pendingCandidates.current.push(candidate);
+    } else {
+      await peerRef.current.addIceCandidate(candidate);
+    }
   };
 
   const createOffer = async () => {
@@ -113,21 +134,73 @@ export function useWebRTC(roomId, user) {
     pendingCandidates.current = [];
   };
 
+  /* ---------------- CONTROLS ---------------- */
+
   const toggleAudio = () => {
-    const track = localStreamRef.current.getAudioTracks()[0];
-    track.enabled = !track.enabled;
+    const track = localStreamRef.current?.getAudioTracks()[0];
+    if (track) track.enabled = !track.enabled;
   };
 
   const toggleVideo = () => {
-    const track = localStreamRef.current.getVideoTracks()[0];
-    track.enabled = !track.enabled;
+    const track = localStreamRef.current?.getVideoTracks()[0];
+    if (track) track.enabled = !track.enabled;
   };
 
-  const cleanup = () => {
-    localStreamRef.current?.getTracks().forEach((t) => t.stop());
-    peerRef.current?.close();
-    socket.disconnect();
+  /* 🖥 Screen sharing (safe replaceTrack) */
+  const startScreenShare = async () => {
+    const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+    });
+
+    const screenTrack = screenStream.getVideoTracks()[0];
+
+    const sender = peerRef.current
+      .getSenders()
+      .find((s) => s.track?.kind === "video");
+
+    if (sender) {
+      sender.replaceTrack(screenTrack);
+    }
+
+    screenStreamRef.current = screenStream;
+
+    screenTrack.onended = stopScreenShare;
   };
+
+  const stopScreenShare = () => {
+    const cameraTrack =
+      localStreamRef.current?.getVideoTracks()[0];
+
+    const sender = peerRef.current
+      .getSenders()
+      .find((s) => s.track?.kind === "video");
+
+    if (sender && cameraTrack) {
+      sender.replaceTrack(cameraTrack);
+    }
+
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current = null;
+  };
+
+  /* ---------------- CLEANUP ---------------- */
+
+  const cleanup = () => {
+    socket.off("ready", onReady);
+    socket.off("offer", onOffer);
+    socket.off("answer", onAnswer);
+    socket.off("ice-candidate", onRemoteIce);
+
+    socket.disconnect();
+
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+
+    peerRef.current?.close();
+    peerRef.current = null;
+  };
+
+  /* ---------------- EXPORT ---------------- */
 
   return {
     localVideoRef,
@@ -135,6 +208,7 @@ export function useWebRTC(roomId, user) {
     status,
     toggleAudio,
     toggleVideo,
+    startScreenShare,
     cleanup,
   };
 }
