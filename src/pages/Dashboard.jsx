@@ -1,20 +1,22 @@
 import { useEffect } from "react";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
+import MeetingHistory from "../components/MeetingHistory";
 import { useAuth } from "../auth/useAuth";
 
 export default function Dashboard() {
   const { user, loading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const handleLogout = () => {
-    // Clear auth data
-    localStorage.removeItem("token");
-    localStorage.removeItem("user"); // if you store user info
-
-    // Optional: clear sessionStorage too
-    sessionStorage.clear();
-
-    // Redirect to login
-    navigate("/login", { replace: true });
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.clear();
+      sessionStorage.clear();
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
   };
 
   useEffect(() => {
@@ -54,13 +56,14 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="mt-12">
+        <div className=" flex flex-col mt-12">
           <button onClick={createRoom} className="btn btn-primary btn-lg px-10">
             ➕ Create New Meeting
           </button>
           <button onClick={handleLogout} className="btn btn-error btn-sm">
             Logout
           </button>
+          <MeetingHistory userId={user.uid} />
         </div>
       </div>
     </div>

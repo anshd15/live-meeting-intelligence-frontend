@@ -26,6 +26,9 @@ export default function Hero() {
     }
   }, [loading, isAuthenticated, navigate]);
 
+  console.log("AUTH STATE →", { loading, isAuthenticated });
+
+
   return (
     <section className="relative px-6 pt-28 pb-24 text-center">
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-500/30 rounded-full blur-3xl animate-pulse" />

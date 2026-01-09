@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../auth/useAuth";
 import { useWebRTC } from "./useWebRTC";
 import VideoGrid from "./VideoGrid";
 import Controls from "./Controls";
 import socket from "../../socket/socket";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "../../firestore";
 
 export default function Room() {
   const { roomId } = useParams();
@@ -13,6 +15,10 @@ export default function Room() {
 
   const [isHost, setIsHost] = useState(false);
   const [requests, setRequests] = useState([]);
+  const [peerUser, setPeerUser] = useState(null);
+
+  const meetingStartedAtRef = useRef(new Date());
+  const meetingSavedRef = useRef(false);
 
   // 🔒 Auth guard
   useEffect(() => {
@@ -24,20 +30,27 @@ export default function Room() {
   // 🧑‍💼 Host + join request listeners
   useEffect(() => {
     const onHost = () => setIsHost(true);
+
     const onJoinRequest = (req) => {
       setRequests((prev) => [...prev, req]);
     };
 
+    const onPeerJoined = (peer) => {
+      setPeerUser(peer); // 🔥 store other participant
+    };
+
     socket.on("host", onHost);
     socket.on("join-request", onJoinRequest);
+    socket.on("peer-joined", onPeerJoined);
 
     return () => {
       socket.off("host", onHost);
       socket.off("join-request", onJoinRequest);
+      socket.off("peer-joined", onPeerJoined);
     };
   }, []);
 
-  // 🎥 WebRTC (ALWAYS CALLED)
+  // 🎥 WebRTC
   const {
     localVideoRef,
     remoteVideoRef,
@@ -48,6 +61,44 @@ export default function Room() {
     cleanup,
   } = useWebRTC(roomId, user);
 
+  // 🧾 Save meeting history (ONCE)
+  const saveMeeting = async () => {
+    if (!user || meetingSavedRef.current) return;
+
+    meetingSavedRef.current = true;
+
+    const endedAt = new Date();
+    const startedAt = meetingStartedAtRef.current;
+
+    const duration = Math.max(
+      1,
+      Math.round((endedAt - startedAt) / 60000)
+    );
+
+    try {
+      await addDoc(collection(db, "meetings"), {
+        userId: user.uid,
+        peerId: peerUser?.uid || null,
+        peerName: peerUser?.displayName || "Unknown",
+        roomId,
+        startedAt,
+        endedAt,
+        duration,
+        createdAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Failed to save meeting:", err);
+    }
+  };
+
+  // 🧹 Cleanup on leave / refresh / tab close
+  useEffect(() => {
+    return () => {
+      saveMeeting();
+      cleanup();
+    };
+  }, []);
+
   if (loading || !user) {
     return (
       <div className="h-screen flex items-center justify-center text-white">
@@ -56,7 +107,8 @@ export default function Room() {
     );
   }
 
-  const leave = () => {
+  const leave = async () => {
+    await saveMeeting();
     cleanup();
     navigate("/");
   };

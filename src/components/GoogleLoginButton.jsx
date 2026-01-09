@@ -12,6 +12,10 @@ export default function GoogleLoginButton() {
 
       const user = result.user;
 
+      // 🔥 NAVIGATE IMMEDIATELY AFTER FIREBASE LOGIN
+      // navigate("/dashboard");
+
+      // 🔹 Backend sync should NOT block navigation
       const userPayload = {
         uid: user.uid,
         name: user.displayName,
@@ -19,15 +23,16 @@ export default function GoogleLoginButton() {
         photoURL: user.photoURL,
       };
 
-      await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/google`, {
+      fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/google`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(userPayload),
+      }).catch((err) => {
+        console.warn("Backend sync failed:", err);
       });
 
-      navigate("/dashboard");
     } catch (err) {
       console.error("Google login failed:", err);
       alert("Login failed. Please try again.");
