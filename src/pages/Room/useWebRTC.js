@@ -10,12 +10,14 @@ export function useWebRTC(roomId, user) {
 
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
+  const screenVideoRef = useRef(null);
   const screenStreamRef = useRef(null);
   const pendingCandidates = useRef([]);
   const startedRef = useRef(false); // 🔑 prevents double start
 
   /* ---------------- STATE ---------------- */
   const [status, setStatus] = useState("idle");
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   /* ---------------- HELPERS ---------------- */
 
@@ -77,7 +79,7 @@ export function useWebRTC(roomId, user) {
   /* ---------------- START WEBRTC ---------------- */
 
   const startWebRTC = async () => {
-    /* 🎥 Local media */
+    /*  Local media */
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
       audio: true,
@@ -90,11 +92,11 @@ export function useWebRTC(roomId, user) {
     }
     localVideoRef.current.srcObject = stream;
 
-    /* 🌐 ICE servers */
+    /*  ICE servers */
     const res = await fetch(`${BACKEND_URL}/api/ice`);
     const { iceServers } = await res.json();
 
-    /* 🤝 Peer */
+    /*  Peer */
     peerRef.current = new RTCPeerConnection({ iceServers });
 
     stream
@@ -122,7 +124,7 @@ export function useWebRTC(roomId, user) {
       setStatus(peerRef.current.iceConnectionState);
     };
 
-    /* 📞 Signaling */
+    /*  Signaling */
     socket.on("ready", onReady);
     socket.on("offer", onOffer);
     socket.on("answer", onAnswer);
@@ -192,10 +194,11 @@ export function useWebRTC(roomId, user) {
     if (sender) sender.replaceTrack(screenTrack);
 
     screenStreamRef.current = screenStream;
+    setIsScreenSharing(true);
     screenTrack.onended = stopScreenShare;
   };
 
-  const stopScreenShare = () => {
+  const stopScreenShare = async () => {
     const cameraTrack = localStreamRef.current?.getVideoTracks()[0];
 
     const sender = peerRef.current
@@ -206,8 +209,15 @@ export function useWebRTC(roomId, user) {
       sender.replaceTrack(cameraTrack);
     }
 
+    // stop screen tracks
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
     screenStreamRef.current = null;
+
+    if (screenVideoRef.current) {
+      screenVideoRef.current.srcObject = null;
+    }
+
+    setIsScreenSharing(false);
   };
 
   /* ---------------- CLEANUP ---------------- */
@@ -233,10 +243,13 @@ export function useWebRTC(roomId, user) {
   return {
     localVideoRef,
     remoteVideoRef,
+    screenVideoRef,
+    isScreenSharing,
     status,
     toggleAudio,
     toggleVideo,
     startScreenShare,
+    stopScreenShare,
     cleanup,
   };
 }

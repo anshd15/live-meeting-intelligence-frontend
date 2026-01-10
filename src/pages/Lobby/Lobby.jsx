@@ -90,7 +90,7 @@ export default function Lobby() {
             autoPlay
             muted
             playsInline
-            className="w-96 rounded-2xl mb-6"
+            className="w-96 rounded-2xl mb-6 -scale-x-100"
           />
         )}
 

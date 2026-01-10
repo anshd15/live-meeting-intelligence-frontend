@@ -20,14 +20,17 @@ export default function Room() {
   const meetingStartedAtRef = useRef(new Date());
   const meetingSavedRef = useRef(false);
 
-  // 🔒 Auth guard
+  const [isAudioOn, setIsAudioOn] = useState(true);
+  const [isVideoOn, setIsVideoOn] = useState(true);
+
+  // Auth guard
   useEffect(() => {
     if (!loading && !user) {
       navigate("/");
     }
   }, [loading, user, navigate]);
 
-  // 🧑‍💼 Host + join request listeners
+  // Host + join request listeners
   useEffect(() => {
     const onHost = () => setIsHost(true);
 
@@ -36,7 +39,7 @@ export default function Room() {
     };
 
     const onPeerJoined = (peer) => {
-      setPeerUser(peer); // 🔥 store other participant
+      setPeerUser(peer); //store other participant
     };
 
     socket.on("host", onHost);
@@ -50,18 +53,21 @@ export default function Room() {
     };
   }, []);
 
-  // 🎥 WebRTC
+  // WebRTC
   const {
     localVideoRef,
     remoteVideoRef,
+    screenVideoRef,
+    isScreenSharing,
     status,
     toggleAudio,
     toggleVideo,
     startScreenShare,
+    stopScreenShare,
     cleanup,
   } = useWebRTC(roomId, user);
 
-  // 🧾 Save meeting history (ONCE)
+  //Save meeting history (ONCE)
   const saveMeeting = async () => {
     if (!user || meetingSavedRef.current) return;
 
@@ -70,10 +76,7 @@ export default function Room() {
     const endedAt = new Date();
     const startedAt = meetingStartedAtRef.current;
 
-    const duration = Math.max(
-      1,
-      Math.round((endedAt - startedAt) / 60000)
-    );
+    const duration = Math.max(1, Math.round((endedAt - startedAt) / 60000));
 
     try {
       await addDoc(collection(db, "meetings"), {
@@ -91,7 +94,7 @@ export default function Room() {
     }
   };
 
-  // 🧹 Cleanup on leave / refresh / tab close
+  // Cleanup on leave / refresh / tab close
   useEffect(() => {
     return () => {
       saveMeeting();
@@ -114,7 +117,7 @@ export default function Room() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center">
+    <div className="min-h-screen bg-[#131314] text-white flex flex-col items-center justify-center">
       <h2 className="mb-2">Room: {roomId}</h2>
       <p className="mb-4">ICE state: {status}</p>
 
