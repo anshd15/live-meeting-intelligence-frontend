@@ -48,14 +48,14 @@ export default function MeetingHistory({ userId }) {
 
   return (
     <div className="mt-16">
-      <h2 className="text-xl font-semibold mb-6">Meeting History</h2>
+      <h2 className="text-xl text-center text-black font-semibold mb-6">Meeting History</h2>
 
-      <div className="rounded-xl border border-slate-800 overflow-hidden">
+      <div className="rounded-2xl border border-slate-950 h-[40vh] overflow-auto">
         <table className="w-full text-left">
-          <thead className="bg-slate-900 text-slate-400 text-sm">
+          <thead className="bg-[#080123] text-slate-300 text-sm">
             <tr>
               <th className="px-6 py-4">Room</th>
-              <th className="px-6 py-4">Date</th>
+              <th className="px-6 py-4">Date & Time</th>
               <th className="px-6 py-4">Duration</th>
             </tr>
           </thead>
@@ -66,7 +66,7 @@ export default function MeetingHistory({ userId }) {
               return (
                 <tr
                   key={m.id}
-                  className="border-t border-slate-800 hover:bg-slate-800/40"
+                  className="border-t border-slate-800 bg-slate-800/55 hover:bg-slate-800/90"
                 >
                   <td className="px-6 py-4 font-mono text-indigo-400">
                     {m.roomId}

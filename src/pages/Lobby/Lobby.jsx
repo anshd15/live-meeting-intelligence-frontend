@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../auth/useAuth";
+import { BiVideoPlus } from "react-icons/bi";
+import { IoArrowBack } from "react-icons/io5";
 
 export default function Lobby() {
   const { roomId } = useParams();
@@ -44,16 +46,12 @@ export default function Lobby() {
   }, [user, loading, navigate]);
 
   const toggleMic = () => {
-    streamRef.current
-      ?.getAudioTracks()
-      .forEach((t) => (t.enabled = !micOn));
+    streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = !micOn));
     setMicOn((v) => !v);
   };
 
   const toggleCam = () => {
-    streamRef.current
-      ?.getVideoTracks()
-      .forEach((t) => (t.enabled = !camOn));
+    streamRef.current?.getVideoTracks().forEach((t) => (t.enabled = !camOn));
     setCamOn((v) => !v);
   };
 
@@ -70,40 +68,50 @@ export default function Lobby() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center px-6">
-      <h1 className="text-2xl font-bold mb-6">
-        Ready to join the meeting?
-      </h1>
-
-      {error ? (
-        <p className="text-red-400">{error}</p>
-      ) : (
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className="w-96 rounded-xl border border-slate-700 mb-6"
+    <div className="h-[90vh] w-screen flex items-center justify-center relative min-h-screen text-white  flex-col  px-6">
+      <div className="absolute inset-0 -z-10 opacity-80 overflow-hidden">
+        <img
+          src="/image.png"
+          draggable="false"
+          className="w-full h-full object-cover blur-[0px]"
         />
-      )}
+      </div>
+      <div className="flex flex-col items-center justify-center p-5 rounded-4xl bg-[#00000082]">
+        <div className="flex items-center justify-center mb-6 gap-4 ">
+          <button className="cursor-pointer hover:scale-125 transition-all duration-500 "><IoArrowBack onClick={() => navigate("/dashboard")} size={30} /></button>
+        <h1 className="text-2xl font-semibold "> Ready to join the meeting?</h1>
+        </div>
 
-      <div className="flex gap-4 mb-8">
-        <button onClick={toggleMic} className="btn btn-outline">
-          {micOn ? "Mic ON" : "Mic OFF"}
-        </button>
+        {error ? (
+          <p className="text-red-400">{error}</p>
+        ) : (
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="w-96 rounded-2xl mb-6"
+          />
+        )}
 
-        <button onClick={toggleCam} className="btn btn-outline">
-          {camOn ? "Camera ON" : "Camera OFF"}
+        <div className="flex gap-4 mb-8">
+          <button onClick={toggleMic} className="btn btn-outline">
+            {micOn ? "Mic ON" : "Mic OFF"}
+          </button>
+
+          <button onClick={toggleCam} className="btn btn-outline">
+            {camOn ? "Camera ON" : "Camera OFF"}
+          </button>
+        </div>
+
+        <button
+          onClick={startCall}
+          className="btn btn-primary btn-lg px-12"
+          disabled={!!error}
+        >
+          <BiVideoPlus size={28} /> Start Call
         </button>
       </div>
-
-      <button
-        onClick={startCall}
-        className="btn btn-primary btn-lg px-12"
-        disabled={!!error}
-      >
-        ▶️ Start Call
-      </button>
     </div>
   );
 }
