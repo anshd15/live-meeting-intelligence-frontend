@@ -13,7 +13,7 @@ export default function Developer() {
 
         <p className="text-slate-500 mt-6 text-sm">
           Designed and engineered with a focus on scalability,
-          reliability, and production-grade real-time communication.
+          reliability, and production grade real-time communication.
         </p>
       </div>
     </section>

@@ -66,7 +66,7 @@ export default function Hero() {
 
         {/* Subtext */}
         <p className="mt-6 text-lg text-slate-400 max-w-2xl mx-auto">
-          A real-time meeting platform built on WebRTC — delivering
+          A real-time meeting platform built on WebRTC delivering
           low-latency, secure video calls that just work, anywhere.
         </p>
 
